@@ -1220,8 +1220,12 @@ extern bool need_shadow_stack_push_pop_p ();
 #define BYTES_PER_RISCV_VECTOR (poly_uint16 (riscv_vector_chunks * riscv_bytes_per_vector_chunk))
 #endif
 
+/* The large code model makes no assumptions about the distance between
+   code and data, so exception handling data needs 8-byte PC-relative
+   encodings there, as on the other targets with a large code model.  */
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL) \
-  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4)
+  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel \
+   | (riscv_cmodel == CM_LARGE ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4))
 
 #define XLEN_SPEC \
   "%{march=rv32*:32}" \

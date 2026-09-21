@@ -93,6 +93,55 @@
    constant pool.  All variable addresses are spilled into constant
    pools.  The constant pools themselves are addressed using PC
    relative accesses.  This only works for the large code model.
+
+   SYMBOL_LARGE_PIC_PREL
+
+   Generate symbol accesses for non-preemptible symbols in the large
+   position-independent code model as a full 64-bit PC-relative
+   displacement.  To compute the address of symbol foo, we generate:
+
+   .Lpc:
+   adr  x0, .Lpc
+   movz tmp, #:prel_g3:foo+4
+   movk tmp, #:prel_g2_nc:foo+8
+   movk tmp, #:prel_g1_nc:foo+12
+   movk tmp, #:prel_g0_nc:foo+16
+   add  x0, x0, tmp
+
+   R_AARCH64_MOVW_PREL_G* resolve as S + A - P against the address P of
+   the instruction being relocated, so each chunk carries an addend equal
+   to its own distance from the ADR; every chunk is then a slice of the
+   same value, foo - .Lpc.  The same sequence applied to
+   _GLOBAL_OFFSET_TABLE_ computes the GOT base, which is held in the
+   pseudo PIC register and initialized once per function.
+
+   SYMBOL_LARGE_PIC_GOT
+
+   Generate symbol accesses for preemptible symbols in the large
+   position-independent code model through the GOT, indexed by a full
+   64-bit GOT offset:
+
+   movz tmp, #:gotoff_g3:foo
+   movk tmp, #:gotoff_g2_nc:foo
+   movk tmp, #:gotoff_g1_nc:foo
+   movk tmp, #:gotoff_g0_nc:foo
+   ldr  x0, [gp, tmp]
+
+   SYMBOL_LARGE_PIC_TLSIE
+
+   Initial-exec TLS in the large position-independent code model.  The
+   offset of the symbol's GOT entry from the GOT base is built with
+   R_AARCH64_TLSIE_MOVW_GOTTPREL_G1 and _G0_NC:
+
+   movz tmp, #:gottprel_g1:foo
+   movk tmp, #:gottprel_g0_nc:foo
+   ldr  tmp, [gp, tmp]
+   mrs  tp, tpidr_el0
+   add  x0, tp, tmp
+
+   The sequences, and the :gotoff_gN: operator spellings, match those
+   used by LLVM for the same code model, so that objects built by either
+   compiler are interchangeable at link time.
  */
 enum aarch64_symbol_type
 {
@@ -109,6 +158,9 @@ enum aarch64_symbol_type
   SYMBOL_TLSLE24,
   SYMBOL_TLSLE32,
   SYMBOL_TLSLE48,
+  SYMBOL_LARGE_PIC_PREL,
+  SYMBOL_LARGE_PIC_GOT,
+  SYMBOL_LARGE_PIC_TLSIE,
   SYMBOL_FORCE_TO_MEM
 };
 
@@ -992,6 +1044,7 @@ bool aarch64_is_mov_xn_imm (unsigned HOST_WIDE_INT);
 bool aarch64_use_return_insn_p (void);
 bool aarch64_use_simple_return_insn_p (void);
 const char *aarch64_output_casesi (rtx *);
+const char *aarch64_output_large_pic_prel (rtx *);
 const char *aarch64_output_load_tp (rtx);
 const char *aarch64_output_sme_zero_za (rtx);
 

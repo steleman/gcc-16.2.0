@@ -189,6 +189,7 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
 	builtin_define ("__AARCH64_CMODEL_SMALL__");
 	break;
       case AARCH64_CMODEL_LARGE:
+      case AARCH64_CMODEL_LARGE_PIC:
 	builtin_define ("__AARCH64_CMODEL_LARGE__");
 	break;
       default:

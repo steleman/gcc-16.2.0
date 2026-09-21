@@ -1782,11 +1782,67 @@ riscv_symbol_binds_local_p (const_rtx x)
 /* Return the method that should be used to access SYMBOL_REF or
    LABEL_REF X.  */
 
+/* Return true if generating code for the large position-independent code
+   model.
+
+   The non-PIC large model loads symbol addresses from a literal pool placed
+   in the function's section, within auipc range of the code.  Under PIC
+   such entries would need dynamic relocations, which cannot live in .text,
+   while a writable section may be too far away to reach with auipc.  This
+   model breaks that dependency:
+
+   - A non-preemptible symbol's pool entry holds the displacement from the
+     entry itself to the symbol.  That is a link-time constant, expressed as
+     an R_RISCV_ADD64/R_RISCV_SUB64 pair, so the pool needs no dynamic
+     relocation and stays read-only:
+
+	lla	a0, .LC0		; a0 = &entry
+	ld	t0, 0(a0)		; t0 = sym - &entry
+	add	a0, a0, t0		; a0 = sym
+     .LC0:
+	.dword	sym-.
+
+   - A preemptible symbol's address lives in a slot in .data.rel.ro, which
+     takes the dynamic relocation, and the pool entry holds the displacement
+     to that slot:
+
+	lla	a0, .LC1
+	ld	t0, 0(a0)
+	add	a0, a0, t0		; a0 = &slot
+	ld	a0, 0(a0)		; a0 = sym
+     .LC1:
+	.dword	.LC2-.
+	.section .data.rel.ro
+     .LC2:
+	.dword	sym
+
+   No new relocation types are needed, so the objects link with any linker
+   supporting the existing RISC-V relocations, and interoperate with objects
+   built by LLVM's implementation of the same code model.  This model is not
+   part of the RISC-V ELF psABI, which currently disallows the large code
+   model with PIC.  */
+
+bool
+riscv_large_pic_p (void)
+{
+  return riscv_cmodel == CM_LARGE && flag_pic;
+}
+
 static enum riscv_symbol_type
 riscv_classify_symbol (const_rtx x)
 {
   if (riscv_tls_symbol_p (x))
     return SYMBOL_TLS;
+
+  /* In the large PIC model, labels and literal pool entries are within the
+     function and reached PC-relatively; everything else goes through the
+     literal pool, in one of the two forms described above.  */
+  if (riscv_large_pic_p ())
+    {
+      if (SYMBOL_REF_P (x) && !CONSTANT_POOL_ADDRESS_P (x))
+	return SYMBOL_FORCE_TO_MEM;
+      return SYMBOL_PCREL;
+    }
 
   if (GET_CODE (x) == SYMBOL_REF && flag_pic && !riscv_symbol_binds_local_p (x))
     return SYMBOL_GOT_DISP;
@@ -2030,6 +2086,131 @@ riscv_float_const_rtx_index_for_fli (rtx x)
 
 /* Implement TARGET_LEGITIMATE_CONSTANT_P.  */
 
+/* Return true if X is a symbolic constant that must be materialized with
+   one of the large PIC sequences.  */
+
+static bool
+riscv_large_pic_symbolic_p (rtx x)
+{
+  if (!riscv_large_pic_p ())
+    return false;
+
+  rtx base, offset;
+  split_const (x, &base, &offset);
+  return (SYMBOL_REF_P (base)
+	  && riscv_classify_symbol (base) == SYMBOL_FORCE_TO_MEM);
+}
+
+/* Return true if X is a literal pool constant created for the large PIC
+   model with unspec CODE.  */
+
+static bool
+riscv_large_pic_pool_constant_p (const_rtx x, int code)
+{
+  return (GET_CODE (x) == CONST
+	  && GET_CODE (XEXP (x, 0)) == UNSPEC
+	  && XINT (XEXP (x, 0), 1) == code);
+}
+
+/* Return a literal pool entry holding the displacement from the entry
+   itself to X.  */
+
+static rtx
+riscv_large_pic_disp_entry (rtx x)
+{
+  rtx c = gen_rtx_CONST (Pmode, gen_rtx_UNSPEC (Pmode, gen_rtvec (1, x),
+						UNSPEC_LARGE_PIC_DISP));
+  rtx mem = force_const_mem (Pmode, c);
+  gcc_assert (mem);
+  return XEXP (mem, 0);
+}
+
+/* Load the address SRC, a symbolic constant for which
+   riscv_large_pic_symbolic_p is true, into DEST.  */
+
+static void
+riscv_legitimize_large_pic_move (rtx dest, rtx src)
+{
+  gcc_assert (TARGET_64BIT && GET_MODE (dest) == Pmode);
+
+  rtx base, offset;
+  split_const (src, &base, &offset);
+  bool local = riscv_symbol_binds_local_p (base);
+
+  rtx tmp;
+  if (can_create_pseudo_p ())
+    tmp = gen_reg_rtx (Pmode);
+  else
+    {
+      /* Only thunks materialize addresses after reload; they have the
+	 prologue temporaries to themselves.  */
+      gcc_assert (riscv_in_thunk_func);
+      tmp = RISCV_PROLOGUE_TEMP (Pmode);
+      if (REGNO (dest) == REGNO (tmp))
+	tmp = gen_rtx_REG (Pmode, GP_TEMP_FIRST + 2);
+    }
+
+  rtx entry;
+  int code;
+  if (local)
+    {
+      entry = riscv_large_pic_disp_entry (src);
+      code = UNSPEC_LARGE_PIC_ADDR;
+    }
+  else
+    {
+      rtx slot = gen_rtx_CONST (Pmode,
+				gen_rtx_UNSPEC (Pmode, gen_rtvec (1, src),
+						UNSPEC_LARGE_PIC_SLOT));
+      rtx mem = force_const_mem (Pmode, slot);
+      gcc_assert (mem);
+      entry = riscv_large_pic_disp_entry (XEXP (mem, 0));
+      code = UNSPEC_LARGE_PIC_GOT;
+    }
+
+  rtx set = gen_rtx_SET (dest, gen_rtx_UNSPEC (Pmode, gen_rtvec (1, entry),
+					       code));
+  emit_insn (gen_rtx_PARALLEL (VOIDmode,
+			       gen_rtvec (2, set,
+					  gen_rtx_CLOBBER (VOIDmode, tmp))));
+}
+
+/* Output the large_pic_load_address pattern, or the large_pic_load_got
+   pattern if INDIRECT.  */
+
+const char *
+riscv_output_large_pic_load (rtx *operands, bool indirect)
+{
+  gcc_assert (REGNO (operands[0]) != REGNO (operands[2]));
+  output_asm_insn ("lla\t%0,%1", operands);
+  output_asm_insn ("ld\t%2,0(%0)", operands);
+  output_asm_insn ("add\t%0,%0,%2", operands);
+  if (indirect)
+    output_asm_insn ("ld\t%0,0(%0)", operands);
+  return "";
+}
+
+/* Implement TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
+
+static bool
+riscv_output_addr_const_extra (FILE *file, rtx x)
+{
+  if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_LARGE_PIC_DISP)
+    {
+      output_addr_const (file, XVECEXP (x, 0, 0));
+      fputs ("-.", file);
+      return true;
+    }
+
+  if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_LARGE_PIC_SLOT)
+    {
+      output_addr_const (file, XVECEXP (x, 0, 0));
+      return true;
+    }
+
+  return false;
+}
+
 static bool
 riscv_legitimate_constant_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
@@ -2061,6 +2242,12 @@ riscv_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 
   if (satisfies_constraint_zfli (x))
    return true;
+
+  /* In the large PIC model an absolute address in the per-function literal
+     pool would need a dynamic relocation in the function's section.  Such
+     constants are handled by riscv_legitimize_large_pic_move instead.  */
+  if (riscv_large_pic_symbolic_p (x))
+    return true;
 
   split_const (x, &base, &offset);
   if (riscv_symbolic_constant_p (base, &type))
@@ -2594,6 +2781,11 @@ riscv_const_insns (rtx x, bool allow_new_pseudos)
 {
   enum riscv_symbol_type symbol_type;
   rtx offset;
+
+  /* Large PIC symbol addresses need a scratch register and can't be
+     rematerialized after reload.  */
+  if (riscv_large_pic_symbolic_p (x))
+    return 0;
 
   switch (GET_CODE (x))
     {
@@ -3437,6 +3629,12 @@ riscv_legitimize_const_move (machine_mode mode, rtx dest, rtx src)
       riscv_legitimize_poly_move (mode, dest_tmp, tmp, XEXP (XEXP (src, 0), 1));
 
       emit_insn (gen_rtx_SET (dest, gen_rtx_PLUS (mode, dest, dest_tmp)));
+      return;
+    }
+
+  if (riscv_large_pic_symbolic_p (src))
+    {
+      riscv_legitimize_large_pic_move (dest, src);
       return;
     }
 
@@ -8449,6 +8647,11 @@ static section *
 riscv_elf_select_rtx_section (machine_mode mode, rtx x,
 			      unsigned HOST_WIDE_INT align)
 {
+  /* Large PIC slots take dynamic relocations, so they cannot stay with
+     the function.  */
+  if (riscv_large_pic_pool_constant_p (x, UNSPEC_LARGE_PIC_SLOT))
+    return default_elf_select_rtx_section (mode, x, align);
+
   /* The literal pool stays with the function.  */
   if (riscv_can_use_per_function_literal_pools_p ())
     return function_section (current_function_decl);
@@ -12389,12 +12592,16 @@ riscv_option_override (void)
   if (riscv_cmodel == CM_LARGE && TARGET_EXPLICIT_RELOCS)
     sorry ("code model %qs with %qs", "large", "-mexplicit-relocs");
 
-  if (riscv_cmodel == CM_LARGE && flag_pic)
-    sorry ("code model %qs with %qs", "large",
-	   global_options.x_flag_pic > 1 ? "-fPIC" : "-fpic");
-
-  if (flag_pic)
+  if (flag_pic && riscv_cmodel != CM_LARGE)
     riscv_cmodel = CM_PIC;
+
+  /* The large code model uses 8-byte PC-relative pointers in exception
+     handling data (see ASM_PREFERRED_EH_DATA_FORMAT).  The assembler
+     always encodes an FDE's initial location with 4 bytes when it builds
+     .eh_frame from .cfi_* directives, so emit .eh_frame directly unless
+     the user asked for the directives.  */
+  if (riscv_cmodel == CM_LARGE && !OPTION_SET_P (flag_dwarf2_cfi_asm))
+    flag_dwarf2_cfi_asm = 0;
 
   /* We need to save the fp with ra for non-leaf functions with no fp and ra
      for leaf functions while no-omit-frame-pointer with
@@ -16733,6 +16940,9 @@ riscv_prefetch_offset_address_p (rtx x, machine_mode mode)
 
 #undef TARGET_ASM_SELECT_RTX_SECTION
 #define TARGET_ASM_SELECT_RTX_SECTION  riscv_elf_select_rtx_section
+
+#undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
+#define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA riscv_output_addr_const_extra
 
 #undef TARGET_MIN_ANCHOR_OFFSET
 #define TARGET_MIN_ANCHOR_OFFSET (-IMM_REACH/2)

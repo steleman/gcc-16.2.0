@@ -52,6 +52,12 @@
   ;; High part of PC-relative address.
   UNSPEC_AUIPC
 
+  ;; Large position-independent code model.
+  UNSPEC_LARGE_PIC_DISP
+  UNSPEC_LARGE_PIC_SLOT
+  UNSPEC_LARGE_PIC_ADDR
+  UNSPEC_LARGE_PIC_GOT
+
   ;; Floating-point unspecs.
   UNSPEC_FLT_QUIET
   UNSPEC_FLE_QUIET
@@ -4663,6 +4669,37 @@
     rotval = GET_MODE_BITSIZE (GET_MODE (operands[1])).to_constant () - 1;
     operands[2] = GEN_INT (rotval);
   })
+
+;; Large position-independent code model.  Operand 1 is a literal pool
+;; entry in the function's section holding the displacement from the
+;; entry itself to the target, which is a link-time constant needing no
+;; dynamic relocation.  Operand 2 is a scratch register.
+(define_insn "large_pic_load_address"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand:DI 1 "pcrel_symbol_operand" "")]
+		   UNSPEC_LARGE_PIC_ADDR))
+   (clobber (match_operand:DI 2 "register_operand" "=r"))]
+  "TARGET_64BIT && riscv_large_pic_p ()"
+  {
+    return riscv_output_large_pic_load (operands, false);
+  }
+  [(set_attr "type" "multi")
+   (set (attr "length") (const_int 16))])
+
+;; As above, except that the pool entry holds the displacement to a slot
+;; in .data.rel.ro containing the address of a preemptible target.  The
+;; slot takes the dynamic relocation.
+(define_insn "large_pic_load_got"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand:DI 1 "pcrel_symbol_operand" "")]
+		   UNSPEC_LARGE_PIC_GOT))
+   (clobber (match_operand:DI 2 "register_operand" "=r"))]
+  "TARGET_64BIT && riscv_large_pic_p ()"
+  {
+    return riscv_output_large_pic_load (operands, true);
+  }
+  [(set_attr "type" "multi")
+   (set (attr "length") (const_int 20))])
 
 (define_insn "*large_load_address"
   [(set (match_operand:DI 0 "register_operand" "=r")

@@ -379,6 +379,79 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   return 1;
 }
 
+/* Return the address range of FDE F.  */
+
+static _Unwind_Ptr
+fde_range (const fde *f)
+{
+  unsigned int f_enc = get_fde_encoding (f);
+  unsigned int f_enc_size = size_of_encoded_value (f_enc);
+  _Unwind_Ptr range;
+
+  read_encoded_value_with_base (f_enc & 0x0f, 0,
+				&f->pc_begin[f_enc_size], &range);
+  return range;
+}
+
+/* Binary search the DW_EH_PE_datarel | DW_EH_PE_sdata8 search table of
+   FDE_COUNT entries at TABLE, relative to HDR, for the FDE covering PC.
+   Linkers use 64-bit entries when code is too far from .eh_frame_hdr for
+   32-bit ones, which can happen with the large code model.  The entries
+   are read with memcpy, since the table is not necessarily 8-byte
+   aligned.  */
+
+static const fde *
+find_fde_sdata8_table (_Unwind_Ptr pc, const struct unw_eh_frame_hdr *hdr,
+		       const unsigned char *table, _Unwind_Ptr fde_count,
+		       _Unwind_Ptr dbase, struct dwarf_eh_bases *bases)
+{
+  _Unwind_Ptr data_base = (_Unwind_Ptr) hdr;
+  size_t lo, hi, mid;
+  signed value __attribute__ ((mode (DI)));
+  _Unwind_Ptr initial_loc, next_loc;
+  fde *f;
+
+#define SDATA8_TABLE_READ(i, field)				\
+  (memcpy (&value, table + (i) * 16 + (field) * 8, sizeof (value)),	\
+   (_Unwind_Ptr) value + data_base)
+
+  if (pc < SDATA8_TABLE_READ (0, 0))
+    return NULL;
+
+  mid = fde_count - 1;
+  if (pc < SDATA8_TABLE_READ (mid, 0))
+    {
+      lo = 0;
+      hi = mid;
+      while (lo < hi)
+	{
+	  mid = (lo + hi) / 2;
+	  initial_loc = SDATA8_TABLE_READ (mid, 0);
+	  next_loc = SDATA8_TABLE_READ (mid + 1, 0);
+	  if (pc < initial_loc)
+	    hi = mid;
+	  else if (pc >= next_loc)
+	    lo = mid + 1;
+	  else
+	    break;
+	}
+      gcc_assert (lo < hi);
+    }
+
+  initial_loc = SDATA8_TABLE_READ (mid, 0);
+  f = (fde *) SDATA8_TABLE_READ (mid, 1);
+#undef SDATA8_TABLE_READ
+
+  if (pc < initial_loc + fde_range (f))
+    {
+      bases->tbase = NULL;
+      bases->dbase = (void *) dbase;
+      bases->func = (void *) initial_loc;
+      return f;
+    }
+  return NULL;
+}
+
 /* Find the FDE for the program counter PC, in a previously located
    PT_GNU_EH_FRAME data region.  *BASES is updated if an FDE to return is
    found.  */
@@ -415,6 +488,22 @@ find_fde_tail (_Unwind_Ptr pc,
   /* We require here specific table encoding to speed things up.
      Also, DW_EH_PE_datarel here means using PT_GNU_EH_FRAME start
      as base, not the processor specific DW_EH_PE_datarel.  */
+  if (hdr->fde_count_enc != DW_EH_PE_omit
+      && sizeof (_Unwind_Ptr) >= 8
+      && hdr->table_enc == (DW_EH_PE_datarel | DW_EH_PE_sdata8))
+    {
+      _Unwind_Ptr fde_count;
+
+      p = read_encoded_value_with_base (hdr->fde_count_enc,
+					base_from_cb_data (hdr->fde_count_enc,
+							   dbase),
+					p, &fde_count);
+      /* Shouldn't happen.  */
+      if (fde_count == 0)
+	return NULL;
+      return find_fde_sdata8_table (pc, hdr, p, fde_count, dbase, bases);
+    }
+
   if (hdr->fde_count_enc != DW_EH_PE_omit
       && hdr->table_enc == (DW_EH_PE_datarel | DW_EH_PE_sdata4))
     {

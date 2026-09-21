@@ -79,9 +79,12 @@ enum aarch64_code_model {
   /* -fpic for small memory model.
      GOT size to 28KiB (4K*8-4K) or 3580 entries.  */
   AARCH64_CMODEL_SMALL_SPIC,
-  /* No assumptions about addresses of code and data.
-     The PIC variant is not yet implemented.  */
-  AARCH64_CMODEL_LARGE
+  /* No assumptions about addresses of code and data.  */
+  AARCH64_CMODEL_LARGE,
+  /* -fpic/-fPIC for the large memory model.  No assumptions about
+     addresses of code, data and GOT.  Symbols are addressed with full
+     64-bit PC-relative and GOT-relative MOVZ/MOVK sequences.  */
+  AARCH64_CMODEL_LARGE_PIC
 };
 
 /* The register to use as a thread pointer for TLS accesses.

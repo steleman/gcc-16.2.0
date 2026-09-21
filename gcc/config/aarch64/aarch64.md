@@ -266,6 +266,9 @@
     UNSPEC_GOTSMALLTLS
     UNSPEC_GOTTINYPIC
     UNSPEC_GOTTINYTLS
+    UNSPEC_LARGE_PIC_PREL
+    UNSPEC_LARGE_PIC_GOTOFF
+    UNSPEC_LARGE_PIC_GOTTPREL
     UNSPEC_STP
     UNSPEC_LDP_FST
     UNSPEC_LDP_SND
@@ -8044,6 +8047,50 @@
   ""
   "adrp\\t%0, %A1\;ldr\\t%w0, [%0, #%L1]"
   [(set_attr "type" "load_4")
+   (set_attr "length" "8")]
+)
+
+;; Large position-independent code model.
+
+;; Materialize the address of a non-preemptible symbol, or of
+;; _GLOBAL_OFFSET_TABLE_, as a full 64-bit PC-relative displacement from
+;; an ADR.  The six instructions must be emitted as one unit: each
+;; R_AARCH64_MOVW_PREL_G* chunk carries an addend equal to its distance
+;; from the ADR.  Operand 2 is the scratch holding the displacement.
+(define_insn "aarch64_load_large_pic_prel"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand:DI 1 "aarch64_valid_symref" "S")]
+		   UNSPEC_LARGE_PIC_PREL))
+   (clobber (match_scratch:DI 2 "=r"))]
+  "aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC"
+  {
+    return aarch64_output_large_pic_prel (operands);
+  }
+  [(set_attr "type" "multiple")
+   (set_attr "length" "24")]
+)
+
+;; The offset of a symbol's GOT entry from the GOT base, as a MOVZ/MOVK
+;; sequence of R_AARCH64_MOVW_GOTOFF_G* relocations.
+(define_insn "aarch64_large_pic_movw_gotoff"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand:DI 1 "aarch64_valid_symref" "S")]
+		   UNSPEC_LARGE_PIC_GOTOFF))]
+  "aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC"
+  "movz\\t%0, #:gotoff_g3:%1\;movk\\t%0, #:gotoff_g2_nc:%1\;movk\\t%0, #:gotoff_g1_nc:%1\;movk\\t%0, #:gotoff_g0_nc:%1"
+  [(set_attr "type" "multiple")
+   (set_attr "length" "16")]
+)
+
+;; The offset of a TLS symbol's initial-exec GOT entry from the GOT base,
+;; using R_AARCH64_TLSIE_MOVW_GOTTPREL_G1 and _G0_NC.
+(define_insn "aarch64_large_pic_movw_gottprel"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand 1 "aarch64_tls_ie_symref" "S")]
+		   UNSPEC_LARGE_PIC_GOTTPREL))]
+  "aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC"
+  "movz\\t%0, #:gottprel_g1:%1\;movk\\t%0, #:gottprel_g0_nc:%1"
+  [(set_attr "type" "multiple")
    (set_attr "length" "8")]
 )
 

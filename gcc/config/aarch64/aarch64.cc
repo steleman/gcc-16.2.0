@@ -3425,6 +3425,79 @@ tls_symbolic_operand_type (rtx addr)
    add  t0, t0, #:tprel_lo12_nc:imm
 */
 
+/* Return the register holding the GOT base in the large
+   position-independent code model.  The register is initialized once per
+   function, on entry, by aarch64_init_pic_reg.  */
+
+static rtx
+aarch64_large_pic_got_base (void)
+{
+  gcc_assert (aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC);
+
+  /* pic_offset_table_rtx can be NULL before RTL expansion, when IVOPTs
+     expands addresses only to compute their costs.  Any register will do
+     for that.  */
+  if (pic_offset_table_rtx == NULL_RTX)
+    return gen_reg_rtx (Pmode);
+
+  crtl->uses_pic_offset_table = 1;
+  return pic_offset_table_rtx;
+}
+
+/* Diagnose a general-dynamic or local-dynamic TLS access to IMM in the
+   large position-independent code model.  Both need TLS descriptors or
+   __tls_get_addr, whose only defined access sequences are ADRP-based and
+   so limited to +/-4GB.  Emitting them would silently reintroduce the
+   limit the code model exists to remove.  */
+
+static void
+aarch64_check_large_pic_tls (rtx imm)
+{
+  static bool diagnosed = false;
+
+  if (aarch64_cmodel != AARCH64_CMODEL_LARGE_PIC || diagnosed)
+    return;
+
+  diagnosed = true;
+  poly_int64 offset;
+  rtx sym = strip_offset_and_salt (imm, &offset);
+  tree decl = SYMBOL_REF_P (sym) ? SYMBOL_REF_DECL (sym) : NULL_TREE;
+  location_t loc = decl ? DECL_SOURCE_LOCATION (decl) : input_location;
+  sorry_at (loc, "general-dynamic and local-dynamic TLS models are not "
+	    "supported with %<-mcmodel=large%> and %<-f%s%>",
+	    flag_pic > 1 ? "PIC" : "pic");
+  inform (loc, "use %<-ftls-model=initial-exec%> or %<-ftls-model=local-exec%>");
+}
+
+/* Output the instruction sequence for the aarch64_load_large_pic_prel
+   pattern: OPERANDS[0] is the destination, OPERANDS[1] the symbolic
+   expression and OPERANDS[2] the scratch register.  */
+
+const char *
+aarch64_output_large_pic_prel (rtx *operands)
+{
+  static const char *const chunk[] = {
+    "movz\t%2, #:prel_g3:%3",
+    "movk\t%2, #:prel_g2_nc:%3",
+    "movk\t%2, #:prel_g1_nc:%3",
+    "movk\t%2, #:prel_g0_nc:%3"
+  };
+  rtx ops[4] = { operands[0], operands[1], operands[2], NULL_RTX };
+
+  gcc_assert (REGNO (operands[0]) != REGNO (operands[2]));
+
+  output_asm_insn ("adr\t%0, .", ops);
+  for (int i = 0; i < 4; i++)
+    {
+      /* R_AARCH64_MOVW_PREL_G* resolves against the address of the MOVZ or
+	 MOVK it relocates, so compensate for its distance from the ADR.  */
+      ops[3] = plus_constant (Pmode, operands[1], 4 * (i + 1));
+      output_asm_insn (chunk[i], ops);
+    }
+  output_asm_insn ("add\t%0, %0, %2", ops);
+  return "";
+}
+
 static void
 aarch64_load_symref_appropriately (rtx dest, rtx imm,
 				   enum aarch64_symbol_type type)
@@ -3553,7 +3626,45 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
       emit_insn (gen_rtx_SET (dest, imm));
       return;
 
+    case SYMBOL_LARGE_PIC_PREL:
+      {
+	gcc_assert (GET_MODE (dest) == DImode && can_create_pseudo_p ());
+	emit_insn (gen_aarch64_load_large_pic_prel (dest, imm));
+	return;
+      }
+
+    case SYMBOL_LARGE_PIC_GOT:
+      {
+	/* The GOT base is a pseudo, so this cannot be used after reload.  */
+	gcc_assert (GET_MODE (dest) == DImode && can_create_pseudo_p ());
+	rtx gp = aarch64_large_pic_got_base ();
+	rtx off = gen_reg_rtx (DImode);
+	emit_insn (gen_aarch64_large_pic_movw_gotoff (off, imm));
+	rtx mem = gen_const_mem (DImode, gen_rtx_PLUS (DImode, gp, off));
+	MEM_NOTRAP_P (mem) = 1;
+	emit_insn (gen_rtx_SET (dest, mem));
+	return;
+      }
+
+    case SYMBOL_LARGE_PIC_TLSIE:
+      {
+	gcc_assert (GET_MODE (dest) == DImode && can_create_pseudo_p ());
+	rtx gp = aarch64_large_pic_got_base ();
+	rtx off = gen_reg_rtx (DImode);
+	emit_insn (gen_aarch64_large_pic_movw_gottprel (off, imm));
+	rtx mem = gen_const_mem (DImode, gen_rtx_PLUS (DImode, gp, off));
+	MEM_NOTRAP_P (mem) = 1;
+	rtx tprel = gen_reg_rtx (DImode);
+	emit_insn (gen_rtx_SET (tprel, mem));
+	rtx tp = aarch64_load_tp (NULL);
+	emit_insn (gen_rtx_SET (dest, gen_rtx_PLUS (DImode, tp, tprel)));
+	if (REG_P (dest))
+	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
+	return;
+      }
+
     case SYMBOL_SMALL_TLSGD:
+      aarch64_check_large_pic_tls (imm);
       {
 	rtx_insn *insns;
 	/* The return type of __tls_get_addr is the C pointer type
@@ -3581,6 +3692,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
       }
 
     case SYMBOL_SMALL_TLSDESC:
+      aarch64_check_large_pic_tls (imm);
       {
 	machine_mode mode = GET_MODE (dest);
 	rtx x0 = gen_rtx_REG (mode, R0_REGNUM);
@@ -6784,6 +6896,8 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	case SYMBOL_SMALL_GOT_4G:
 	case SYMBOL_TINY_GOT:
 	case SYMBOL_TINY_TLSIE:
+	case SYMBOL_LARGE_PIC_GOT:
+	case SYMBOL_LARGE_PIC_TLSIE:
 	  if (const_offset != 0)
 	    {
 	      gcc_assert(can_create_pseudo_p ());
@@ -6800,6 +6914,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	case SYMBOL_TLSLE24:
 	case SYMBOL_TLSLE32:
 	case SYMBOL_TLSLE48:
+	case SYMBOL_LARGE_PIC_PREL:
 	  aarch64_load_symref_appropriately (dest, imm, sty);
 	  return;
 
@@ -14317,7 +14432,8 @@ static inline bool
 aarch64_can_use_per_function_literal_pools_p (void)
 {
   return (aarch64_pcrelative_literal_loads
-	  || aarch64_cmodel == AARCH64_CMODEL_LARGE);
+	  || aarch64_cmodel == AARCH64_CMODEL_LARGE
+	  || aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC);
 }
 
 static bool
@@ -16107,6 +16223,14 @@ cost_plus:
 	  /* LDR.  */
 	  if (speed)
 	    *cost += extra_cost->ldst.load;
+	}
+      else if (aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC)
+	{
+	  /* ADR, MOVZ, three MOVKs and ADD, or four MOVZ/MOVKs indexing the
+	     GOT base.  */
+	  *cost += COSTS_N_INSNS (4);
+	  if (speed)
+	    *cost += 2 * extra_cost->alu.arith;
 	}
       else if (aarch64_cmodel == AARCH64_CMODEL_SMALL
 	       || aarch64_cmodel == AARCH64_CMODEL_SMALL_PIC)
@@ -20223,15 +20347,21 @@ initialize_aarch64_code_model (struct gcc_options *opts)
 	}
       break;
     case AARCH64_CMODEL_LARGE:
-      if (opts->x_flag_pic)
-	sorry ("code model %qs with %<-f%s%>", "large",
-	       opts->x_flag_pic > 1 ? "PIC" : "pic");
       if (opts->x_aarch64_abi == AARCH64_ABI_ILP32)
 	sorry ("code model %qs not supported in ilp32 mode", "large");
+      else if (opts->x_flag_pic)
+	{
+	  if (TARGET_PECOFF)
+	    sorry ("code model %qs with %<-f%s%>", "large",
+		   opts->x_flag_pic > 1 ? "PIC" : "pic");
+	  else
+	    aarch64_cmodel = AARCH64_CMODEL_LARGE_PIC;
+	}
       break;
     case AARCH64_CMODEL_TINY_PIC:
     case AARCH64_CMODEL_SMALL_PIC:
     case AARCH64_CMODEL_SMALL_SPIC:
+    case AARCH64_CMODEL_LARGE_PIC:
       gcc_unreachable ();
     }
 }
@@ -22131,6 +22261,8 @@ aarch64_classify_tls_symbol (rtx x)
 	case AARCH64_CMODEL_TINY:
 	case AARCH64_CMODEL_TINY_PIC:
 	  return SYMBOL_TINY_TLSIE;
+	case AARCH64_CMODEL_LARGE_PIC:
+	  return SYMBOL_LARGE_PIC_TLSIE;
 	default:
 	  return SYMBOL_SMALL_TLSIE;
 	}
@@ -22170,6 +22302,9 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	{
 	case AARCH64_CMODEL_LARGE:
 	  return SYMBOL_FORCE_TO_MEM;
+
+	case AARCH64_CMODEL_LARGE_PIC:
+	  return SYMBOL_LARGE_PIC_PREL;
 
 	case AARCH64_CMODEL_TINY_PIC:
 	case AARCH64_CMODEL_TINY:
@@ -22241,6 +22376,26 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	    return SYMBOL_SMALL_ABSOLUTE;
 	  else
 	    return SYMBOL_FORCE_TO_MEM;
+
+	case AARCH64_CMODEL_LARGE_PIC:
+	  /* Preemptible symbols go through the GOT, as in the small PIC
+	     models.  */
+	  if (!aarch64_symbol_binds_local_p (x))
+	    return SYMBOL_LARGE_PIC_GOT;
+
+	  /* Constant pool entries are emitted in per-function literal pools,
+	     so they are always within reach of the function referring to
+	     them, exactly as in the non-PIC large model.  The pools contain
+	     no relocations, since symbolic constants are never forced to
+	     memory in this model.  */
+	  if (CONSTANT_POOL_ADDRESS_P (x))
+	    return (aarch64_pcrelative_literal_loads
+		    ? SYMBOL_TINY_ABSOLUTE : SYMBOL_SMALL_ABSOLUTE);
+
+	  /* Everything else binds locally and is addressed with a full
+	     64-bit PC-relative displacement, which also absorbs any
+	     offset.  */
+	  return SYMBOL_LARGE_PIC_PREL;
 
 	default:
 	  gcc_unreachable ();
@@ -30291,7 +30446,30 @@ aarch64_empty_mask_is_expensive (unsigned)
 bool
 aarch64_use_pseudo_pic_reg (void)
 {
-  return aarch64_cmodel == AARCH64_CMODEL_SMALL_SPIC;
+  return (aarch64_cmodel == AARCH64_CMODEL_SMALL_SPIC
+	  || aarch64_cmodel == AARCH64_CMODEL_LARGE_PIC);
+}
+
+/* Implement TARGET_INIT_PIC_REG.  In the large position-independent code
+   model, compute the GOT base once on function entry rather than at every
+   GOT access; the computation takes six instructions.  */
+
+static void
+aarch64_init_pic_reg (void)
+{
+  if (aarch64_cmodel != AARCH64_CMODEL_LARGE_PIC
+      || !crtl->uses_pic_offset_table
+      || pic_offset_table_rtx == NULL_RTX)
+    return;
+
+  start_sequence ();
+  rtx got = gen_rtx_SYMBOL_REF (Pmode, "_GLOBAL_OFFSET_TABLE_");
+  emit_insn (gen_aarch64_load_large_pic_prel (pic_offset_table_rtx, got));
+  rtx_insn *seq = end_sequence ();
+
+  edge entry_edge = single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+  insert_insn_on_edge (seq, entry_edge);
+  commit_one_edge_insertion (entry_edge);
 }
 
 /* Implement TARGET_UNSPEC_MAY_TRAP_P.  */
@@ -33940,6 +34118,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_USE_PSEUDO_PIC_REG
 #define TARGET_USE_PSEUDO_PIC_REG aarch64_use_pseudo_pic_reg
+
+#undef TARGET_INIT_PIC_REG
+#define TARGET_INIT_PIC_REG aarch64_init_pic_reg
 
 #undef TARGET_PRINT_OPERAND
 #define TARGET_PRINT_OPERAND aarch64_print_operand

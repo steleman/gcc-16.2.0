@@ -21288,9 +21288,21 @@ dynamically linked.  This is the default code model.
 @opindex mcmodel=large
 @item -mcmodel=large
 Generate code for the large code model.  This makes no assumptions about
-addresses and sizes of sections.  Programs can be statically linked only.  The
-@option{-mcmodel=large} option is incompatible with @option{-mabi=ilp32},
-@option{-fpic} and @option{-fPIC}.
+addresses and sizes of sections.  The @option{-mcmodel=large} option is
+incompatible with @option{-mabi=ilp32}.
+
+Combined with @option{-fpic}, @option{-fPIC}, @option{-fpie} or
+@option{-fPIE}, the large code model makes no assumptions about the
+distance between code, data and the global offset table either.  Symbols
+that bind locally are addressed with a 64-bit PC-relative displacement built
+from @code{R_AARCH64_MOVW_PREL_G*} relocations, and other symbols are loaded
+from the global offset table using a 64-bit offset built from
+@code{R_AARCH64_MOVW_GOTOFF_G*} relocations.  Initial-exec TLS uses
+@code{R_AARCH64_TLSIE_MOVW_GOTTPREL_G1} and @code{_G0_NC}, which limits the
+global offset table to 4GB.  The general-dynamic and local-dynamic TLS models
+are not supported.  The code sequences are the same as those used by other
+compilers implementing this code model, but are not specified by the AArch64
+ELF ABI, and require assembler and linker support for these relocations.
 
 @item -mtp=@var{name}
 @opindex mtp
@@ -31335,7 +31347,18 @@ executables or libraries.
 @opindex mcmodel=large
 @item -mcmodel=large
 Generate code for a large code model, which has no restrictions on size or
-placement of symbols.
+placement of symbols.  This code model is only available for RV64 and is
+incompatible with @option{-mexplicit-relocs}.
+
+Combined with @option{-fpic}, @option{-fPIC}, @option{-fpie} or
+@option{-fPIE}, symbol addresses are not placed in the per-function literal
+pool directly.  Instead the pool holds the link-time constant displacement
+from each entry to either a symbol that binds locally or a slot in
+@code{.data.rel.ro} holding the address of any other symbol, so the code
+needs no dynamic relocations.  Thread-local storage is accessed with the
+usual PC-relative sequences, which limit the distance between the code and
+the global offset table to 2 GiB.  This form of the large code model is not
+part of the RISC-V ELF psABI.
 
 @opindex mexplicit-relocs
 @opindex mno-explicit-relocs
