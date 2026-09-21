@@ -1,3 +1,6 @@
 # Override t-slibgcc-elf-ver to export some libgcc symbols with
 # the symbol versions that glibc used.
 SHLIB_MAPFILES += $(srcdir)/config/libgcc-glibc.ver
+
+LIBGCC2_CFLAGS += -Wa,--generate-missing-build-notes=yes
+CRTSTUFF_CFLAGS += -Wa,--generate-missing-build-notes=yes

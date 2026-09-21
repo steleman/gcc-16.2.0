@@ -60,6 +60,63 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "graphite.h"
 
+__typeof (isl_pointers__) isl_pointers__;
+
+static bool
+init_isl_pointers (void)
+{
+  void *h = NULL;
+  extern const char **toplev_main_argv;
+  char *buf, *p;
+  size_t len;
+
+  if (isl_pointers__.inited)
+    return isl_pointers__.h != NULL;
+  len = progname - toplev_main_argv[0];
+  buf = XALLOCAVAR (char, len + sizeof "libisl.so.23");
+  memcpy (buf, toplev_main_argv[0], len);
+  strcpy (buf + len, "libisl.so.23");
+  len += sizeof "libisl.so.23";
+  p = strstr (buf, "/libexec/");
+  if (p != NULL)
+    {
+      while (1)
+	{
+	  char *q = strstr (p + 8, "/libexec/");
+	  if (q == NULL)
+	    break;
+	  p = q;
+	}
+      memmove (p + 4, p + 8, len - (p + 8 - buf));
+      h = dlopen (buf, RTLD_LAZY);
+      if (h == NULL)
+	{
+	  len = progname - toplev_main_argv[0];
+	  memcpy (buf, toplev_main_argv[0], len);
+	  strcpy (buf + len, "libisl.so.23");
+	}
+    }
+  if (h == NULL)
+    h = dlopen (buf, RTLD_LAZY);
+  isl_pointers__.h = h;
+  if (h == NULL)
+    return false;
+#define DYNSYM(x) \
+  do \
+    { \
+      union { __typeof (isl_pointers__.p_##x) p; void *q; } u; \
+      u.q = dlsym (h, #x); \
+      if (u.q == NULL) \
+	return false; \
+      isl_pointers__.p_##x = u.p; \
+    } \
+  while (0)
+  DYNSYMS
+#undef DYNSYM
+  isl_pointers__.inited = true;
+  return true;
+}
+
 /* Print global statistics to FILE.  */
 
 static void
@@ -424,6 +481,15 @@ graphite_transform_loops (void)
   if (parallelized_function_p (cfun->decl))
     return;
 
+  if (number_of_loops (cfun) <= 1)
+    return;
+
+  if (!init_isl_pointers ())
+    {
+      sorry ("Graphite loop optimizations cannot be used");
+      return;
+    }
+
   calculate_dominance_info (CDI_DOMINATORS);
 
   /* We rely on post-dominators during merging of SESE regions so those
@@ -519,6 +585,14 @@ graphite_transform_loops (void)
       release_recorded_exits (cfun);
       tree_estimate_probability (false);
     }
+}
+
+const char *
+get_isl_version (bool force)
+{
+  if (force)
+    init_isl_pointers ();
+  return (isl_pointers__.inited && isl_version) ? isl_version () : "none";
 }
 
 #else /* If isl is not available: #ifndef HAVE_isl.  */

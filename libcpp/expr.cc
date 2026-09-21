@@ -874,50 +874,54 @@ cpp_classify_number (cpp_reader *pfile, const cpp_token *token,
       if ((result & CPP_N_WIDTH) == CPP_N_LARGE
 	  && CPP_OPTION (pfile, cpp_warn_long_long))
         {
-          const char *message = CPP_OPTION (pfile, cplusplus)
-				? N_("use of C++11 long long integer constant")
-		                : N_("use of C99 long long integer constant");
-
 	  if (CPP_OPTION (pfile, c99))
-            cpp_warning_with_line (pfile, CPP_W_LONG_LONG, virtual_location,
-				   0, message);
+            cpp_warning_with_line (pfile, CPP_W_LONG_LONG, virtual_location, 0,
+				   CPP_OPTION (pfile, cplusplus)
+				   ? N_("use of C++11 long long integer "
+					"constant")
+				   : N_("use of C99 long long integer "
+					"constant"));
           else
             cpp_pedwarning_with_line (pfile, CPP_W_LONG_LONG,
-				      virtual_location, 0, message);
+				      virtual_location, 0,
+				      CPP_OPTION (pfile, cplusplus)
+				      ? N_("use of C++11 long long integer "
+					   "constant")
+				      : N_("use of C99 long long integer "
+					   "constant"));
         }
 
       if ((result & CPP_N_SIZE_T) == CPP_N_SIZE_T
 	  && !CPP_OPTION (pfile, size_t_literals))
-       {
-	  const char *message
-	    = (result & CPP_N_UNSIGNED) == CPP_N_UNSIGNED
-	      ? N_("use of C++23 %<size_t%> integer constant")
-	      : N_("use of C++23 %<make_signed_t<size_t>%> integer constant");
-	  cpp_warning_with_line (pfile, CPP_W_SIZE_T_LITERALS,
-				 virtual_location, 0, message);
-       }
+	cpp_warning_with_line (pfile, CPP_W_SIZE_T_LITERALS,
+			       virtual_location, 0,
+			       (result & CPP_N_UNSIGNED) == CPP_N_UNSIGNED
+				? N_("use of C++23 %<size_t%> integer "
+				     "constant")
+				: N_("use of C++23 %<make_signed_t<size_t>%> "
+				     "integer constant"));
 
       if ((result & CPP_N_BITINT) != 0
 	  && CPP_OPTION (pfile, cpp_warn_c11_c23_compat) != 0)
 	{
 	  if (CPP_OPTION (pfile, cpp_warn_c11_c23_compat) > 0)
 	    {
-	      const char *message = N_("ISO C does not support literal "
-				       "%<wb%> suffixes before C23");
 	      if (CPP_PEDANTIC (pfile) && !CPP_OPTION (pfile, true_false))
 		cpp_pedwarning_with_line (pfile, CPP_W_C11_C23_COMPAT,
-					  virtual_location, 0, message);
+					  virtual_location, 0,
+					  "ISO C does not support literal "
+					  "%<wb%> suffixes before C23");
 	      else
 		cpp_warning_with_line (pfile, CPP_W_C11_C23_COMPAT,
-				       virtual_location, 0, message);
+				       virtual_location, 0,
+				       "ISO C does not support literal "
+				       "%<wb%> suffixes before C23");
 	    }
 	  else if (!CPP_OPTION (pfile, true_false))
-	    {
-	      const char *message = N_("ISO C does not support literal "
-				       "%<wb%> suffixes before C23");
-	      cpp_pedwarning_with_line (pfile, CPP_W_PEDANTIC,
-					virtual_location, 0, message);
-	    }
+	    cpp_pedwarning_with_line (pfile, CPP_W_PEDANTIC,
+				      virtual_location, 0,
+				      "ISO C does not support literal "
+				      "%<wb%> suffixes before C23");
 	}
 
       result |= CPP_N_INTEGER;

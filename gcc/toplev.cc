@@ -102,6 +102,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #ifdef HAVE_isl
 #include <isl/version.h>
+extern const char *get_isl_version (bool);
 #endif
 
 static void general_init (const char *, bool, unique_argv original_argv);
@@ -112,6 +113,8 @@ static void finalize ();
 
 static void crash_signal (int) ATTRIBUTE_NORETURN;
 static void compile_file (void);
+
+const char **toplev_main_argv;
 
 /* Decoded options, and number of such options.  */
 struct cl_decoded_option *save_decoded_options;
@@ -655,7 +658,7 @@ print_version (FILE *file, const char *indent, bool show_global_state)
 #ifndef HAVE_isl
 	   "none"
 #else
-	   isl_version ()
+	   get_isl_version (*indent == 0)
 #endif
 	   );
   if (strcmp (GCC_GMP_STRINGIFY_VERSION, gmp_version))
@@ -2308,6 +2311,8 @@ toplev::main (int argc, char **argv)
   unique_argv original_argv (dupargv (argv));
 
   expandargv (&argc, &argv);
+
+  toplev_main_argv = const_cast <const char **> (argv);
 
   /* Initialization of GCC's environment, and diagnostics.  */
   general_init (argv[0], m_init_signals, std::move (original_argv));

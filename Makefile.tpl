@@ -466,10 +466,10 @@ LDFLAGS = @LDFLAGS@
 LIBCFLAGS = $(CFLAGS)
 CXXFLAGS = @CXXFLAGS@
 LIBCXXFLAGS = $(CXXFLAGS) -fno-implicit-templates
-GOCFLAGS = $(CFLAGS)
-A68FLAGS = @A68FLAGS@
-GDCFLAGS = @GDCFLAGS@
-GM2FLAGS = $(CFLAGS)
+GOCFLAGS = $(filter-out -Wformat-security,$(CFLAGS))
+A68FLAGS = $(filter-out -Wformat-security,@A68FLAGS@)
+GDCFLAGS = $(filter-out -Wformat-security,@GDCFLAGS@)
+GM2FLAGS = $(filter-out -Wformat-security,$(CFLAGS))
 
 CRAB1_LIBS = @CRAB1_LIBS@
 

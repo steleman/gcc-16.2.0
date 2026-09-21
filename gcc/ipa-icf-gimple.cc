@@ -437,12 +437,23 @@ func_checker::compare_operand (tree t1, tree t2, operand_access_type access)
 		 ("compare_ao_refs failed (dependence clique difference)");
       gcc_unreachable ();
     }
+  else if (TREE_CODE (t1) == ADDR_EXPR && TREE_CODE (t2) == ADDR_EXPR)
+    {
+      /* For ADDR_EXPR compare the operands of the ADDR_EXPR rather than
+	 the ADDR_EXPRs themselves.  operand_equal_p will compare the
+	 operands with OEP_ADDRESS_OF and only care about the value
+	 of the ADDR_EXPR, rather than e.g. types of MEM_REFs in there.
+	 Some optimizations use such details though, see PR119006.  */
+      if (operand_equal_p (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0),
+			   OEP_MATCH_SIDE_EFFECTS))
+	return true;
+      return return_false_with_msg ("operand_equal_p failed");
+    }
   else
     {
       if (operand_equal_p (t1, t2, OEP_MATCH_SIDE_EFFECTS))
 	return true;
-      return return_false_with_msg
-		 ("operand_equal_p failed");
+      return return_false_with_msg ("operand_equal_p failed");
     }
 }
 
