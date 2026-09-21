@@ -1,0 +1,8 @@
+Document how 'as' handles the case if GCC/nvptx emits both a '.extern' and a '.visible' variable definition.
+
+
+RUN: %target_as_cmd --no-verify %S/order-2-1.s -o %t
+RUN: cmp %S/order-2-1.o.golden %t
+
+RUN: %target_as_cmd --no-verify %S/order-2-1.o.golden -o %t
+RUN: cmp %S/order-2-1.o.golden %t

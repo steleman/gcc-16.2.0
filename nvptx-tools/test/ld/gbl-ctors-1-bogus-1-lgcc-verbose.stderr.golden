@@ -1,0 +1,7 @@
+resolving lib libgcc.a
+Enqueueing gbl-ctors-1-bogus-1.o
+trying lib libgcc/libgcc.a
+Starting first resolve run
+Resolving *inputfile 0 gbl-ctors-1-bogus-1.o via gbl-ctors-1-bogus-1.o
+Linking gbl-ctors-1-bogus-1.o as 0
+unexpected special-purpose function name: '_GLOBAL__'

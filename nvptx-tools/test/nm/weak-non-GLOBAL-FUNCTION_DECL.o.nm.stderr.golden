@@ -1,0 +1,2 @@
+error, non-GLOBAL DECL is "weak": 'foo'
+while scanning 'weak-non-GLOBAL-FUNCTION_DECL.o'

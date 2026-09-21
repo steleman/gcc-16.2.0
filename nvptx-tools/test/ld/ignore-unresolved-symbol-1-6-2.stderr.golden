@@ -1,0 +1,6 @@
+Enqueueing o/a.o
+trying lib a/libf2.a
+Starting first resolve run
+Resolving *inputfile 0 o/a.o via o/a.o
+Linking o/a.o as 0
+unresolved symbol f3

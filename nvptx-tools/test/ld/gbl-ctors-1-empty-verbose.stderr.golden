@@ -1,0 +1,5 @@
+Enqueueing empty.o
+Starting first resolve run
+Resolving *inputfile 0 empty.o via empty.o
+Linking empty.o as 0
+Disabling handling of special-purpose functions; '__trigger_gbl_ctors' not available

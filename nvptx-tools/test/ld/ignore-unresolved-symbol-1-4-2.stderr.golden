@@ -1,0 +1,9 @@
+Enqueueing o/a.o
+trying lib a/libf123.a
+Starting first resolve run
+Resolving *inputfile 0 o/a.o via o/a.o
+Linking o/a.o as 0
+Resolving f3 via a/libf123.a::f123.o/         
+Resolving f1 also via a/libf123.a::f123.o/         
+Linking a/libf123.a::f123.o/          as 1
+Disabling handling of special-purpose functions; '__trigger_gbl_ctors' not available

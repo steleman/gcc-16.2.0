@@ -1,0 +1,13 @@
+Enqueueing o/f1.o
+Enqueueing o/a.o
+trying lib a/libf.a
+Starting first resolve run
+Resolving *inputfile 1 o/a.o via o/a.o
+Resolving *inputfile 0 o/f1.o via o/f1.o
+Linking o/f1.o as 0
+Linking o/a.o as 1
+Resolving f3 via a/libf.a::f123.o/         
+Resolving f2 also via a/libf.a::f123.o/         
+Linking a/libf.a::f123.o/          as 2
+error, multiple definitions of 'f1'
+first defined in 'o/f1.o', now found another definition while linking 'a/libf.a::f123.o/         '

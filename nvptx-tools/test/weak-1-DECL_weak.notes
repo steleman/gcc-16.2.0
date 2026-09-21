@@ -1,0 +1,4 @@
+Given "error: PTX does not support weak declarations (only weak definitions)",
+GCC/nvptx never emits a "weak" DECL alone.  It doesn, however, emit a "weak"
+GLOBAL FUNCTION DECL before a "strong" GLOBAL FUNCTION DECL, so we have to
+handle "weak" DECLs anyway, and therefore also want to test it individually.

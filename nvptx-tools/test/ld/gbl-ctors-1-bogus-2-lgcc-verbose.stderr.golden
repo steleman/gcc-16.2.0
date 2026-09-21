@@ -1,0 +1,7 @@
+resolving lib libgcc.a
+Enqueueing gbl-ctors-1-bogus-2.o
+trying lib libgcc/libgcc.a
+Starting first resolve run
+Resolving *inputfile 0 gbl-ctors-1-bogus-2.o via gbl-ctors-1-bogus-2.o
+Linking gbl-ctors-1-bogus-2.o as 0
+unable to extract priority from special-purpose function '_GLOBAL__I_three_0_c1'

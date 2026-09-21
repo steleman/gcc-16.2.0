@@ -1,0 +1,15 @@
+Enqueueing o/a.o
+Enqueueing o/f1.o
+Enqueueing o/f2.o
+Enqueueing o/f3.o
+trying lib a/libf.a
+Starting first resolve run
+Resolving *inputfile 3 o/f3.o via o/f3.o
+Resolving *inputfile 2 o/f2.o via o/f2.o
+Resolving *inputfile 1 o/f1.o via o/f1.o
+Resolving *inputfile 0 o/a.o via o/a.o
+Linking o/a.o as 0
+Linking o/f1.o as 1
+Linking o/f2.o as 2
+Linking o/f3.o as 3
+Disabling handling of special-purpose functions; '__trigger_gbl_ctors' not available

@@ -1,0 +1,472 @@
+Verify handling of "weak" symbols
+
+
+RUN: rm -rf %t
+RUN: mkdir -p %t
+
+RUN: printf '\0' > %t/NUL
+
+
+Verify 'as' handling of PTX '.weak' linking directives; 'weak-1-DEF_weak.s'.
+
+GCC/nvptx currently emits the PTX '.weak' linking directive without special
+annotation in the corresponding marker line.  Verify that 'as' handles this in
+a way that other tools can rely on.  In particular: that '.weak ' follows
+directly after the marker line.
+
+RUN: %target_as_cmd --no-verify %S/weak-1-DEF_weak.s -o %t/weak-1-DEF_weak.o
+RUN: cmp %S/weak-1-DEF_weak.o.golden %t/weak-1-DEF_weak.o
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o' twice.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Enter 'weak-1-DECL_weak.s' (see 'weak-1-DECL_weak.notes').
+
+RUN: %target_as_cmd --no-verify %S/weak-1-DECL_weak.s -o %t/weak-1-DECL_weak.o
+RUN: cmp %S/weak-1-DECL_weak.o.golden %t/weak-1-DECL_weak.o
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DECL_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o'.
+
+RUN: rm -f %t/nvptx
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr; r=$?; [ x"$r" = x1 ]
+RUN: cmp %S/weak-1-DECL_weak.o.ld.stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL_weak.o' twice.
+
+RUN: rm -f %t/nvptx
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr; r=$?; [ x"$r" = x1 ]
+RUN: cmp %S/weak-1-DECL_weak.o.ld.stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Enter 'weak-1-DECL.s'.
+
+RUN: %target_as_cmd --no-verify %S/weak-1-DECL.s -o %t/weak-1-DECL.o
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DECL.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL.o', 'weak-1-DECL_weak.o'.
+
+RUN: rm -f %t/nvptx
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr; r=$?; [ x"$r" = x1 ]
+RUN: cmp %S/weak-1-DECL.o.ld.stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DECL.o'.
+
+RUN: rm -f %t/nvptx
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr; r=$?; [ x"$r" = x1 ]
+RUN: cmp %S/weak-1-DECL_weak.o.ld.stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DECL.o' twice.
+
+RUN: rm -f %t/nvptx
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DECL.o %t/weak-1-DECL_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr; r=$?; [ x"$r" = x1 ]
+RUN: cmp %S/weak-1-DECL_weak.o.ld.stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL_weak.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL_weak.o' twice.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL.o' twice.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL.o %t/weak-1-DEF_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL.o', 'weak-1-DECL_weak.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DECL_weak.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL_weak.o', 'weak-1-DECL.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DECL_weak.o', 'weak-1-DECL.o' twice.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o %t/weak-1-DECL.o %t/weak-1-DEF_weak.o %t/weak-1-DECL_weak.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF_weak.o.nm.golden %t/stdout
+
+
+Enter 'weak-1-DEF.s'.
+
+RUN: %target_as_cmd --no-verify %S/weak-1-DEF.s -o %t/weak-1-DEF.o
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF.o', 'weak-1-DECL_weak.o'.
+
+RUN: cat %t/weak-1-DEF.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF.o'.
+
+RUN: cat %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF.o' twice.
+
+RUN: rm -f %t/stderr.golden
+RUN: echo "error, multiple definitions of '__exitval_ptr'" > %t/stderr.golden
+RUN: echo "first defined in 'weak-1-DEF.o', now found another definition while linking 'weak-1-DEF.o'" >> %t/stderr.golden
+
+RUN: rm -f %t/nvptx
+RUN: ( cd %t/ && %target_ld_cmd -o nvptx weak-1-DECL_weak.o weak-1-DEF.o weak-1-DECL_weak.o weak-1-DEF.o > stdout 2> stderr ); r=$?; [ x"$r" = x1 ]
+RUN: cmp %t/stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DEF.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DEF.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o' twice.
+
+RUN: rm -f %t/stderr.golden
+RUN: echo "error, multiple definitions of '__exitval_ptr'" > %t/stderr.golden
+RUN: echo "first defined in 'weak-1-DEF.o', now found another definition while linking 'weak-1-DEF.o'" >> %t/stderr.golden
+
+RUN: rm -f %t/nvptx
+RUN: ( cd %t/ && %target_ld_cmd -o nvptx weak-1-DEF_weak.o weak-1-DEF.o weak-1-DEF_weak.o weak-1-DEF.o > stdout 2> stderr ); r=$?; [ x"$r" = x1 ]
+RUN: cmp %t/stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL.o', 'weak-1-DEF.o', 'weak-1-DECL_weak.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DEF.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF.o', 'weak-1-DECL.o'.
+
+RUN: cat %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DEF.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF.o', 'weak-1-DECL.o' twice.
+
+RUN: rm -f %t/stderr.golden
+RUN: echo "error, multiple definitions of '__exitval_ptr'" > %t/stderr.golden
+RUN: echo "first defined in 'weak-1-DEF.o', now found another definition while linking 'weak-1-DEF.o'" >> %t/stderr.golden
+
+RUN: rm -f %t/nvptx
+RUN: ( cd %t/ && %target_ld_cmd -o nvptx weak-1-DECL_weak.o weak-1-DEF.o weak-1-DECL.o weak-1-DECL_weak.o weak-1-DEF.o weak-1-DECL.o > stdout 2> stderr ); r=$?; [ x"$r" = x1 ]
+RUN: cmp %t/stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL.o', 'weak-1-DECL_weak.o', 'weak-1-DEF.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DECL_weak.o %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL.o', 'weak-1-DEF.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DEF.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o', 'weak-1-DECL.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DECL.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DEF.o %t/weak-1-DECL.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o', 'weak-1-DECL.o' twice.
+
+RUN: rm -f %t/stderr.golden
+RUN: echo "error, multiple definitions of '__exitval_ptr'" > %t/stderr.golden
+RUN: echo "first defined in 'weak-1-DEF.o', now found another definition while linking 'weak-1-DEF.o'" >> %t/stderr.golden
+
+RUN: rm -f %t/nvptx
+RUN: ( cd %t/ && %target_ld_cmd -o nvptx weak-1-DEF_weak.o weak-1-DEF.o weak-1-DECL.o weak-1-DEF_weak.o weak-1-DEF.o weak-1-DECL.o > stdout 2> stderr ); r=$?; [ x"$r" = x1 ]
+RUN: cmp %t/stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL.o', 'weak-1-DEF_weak.o', 'weak-1-DEF.o'.
+
+RUN: cat %t/weak-1-DECL.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL.o %t/weak-1-DEF_weak.o %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF.o', 'weak-1-DEF_weak.o'.
+
+RUN: cat %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DEF.o %t/weak-1-DEF_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o', 'weak-1-DECL_weak.o'.
+
+RUN: cat %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL %t/weak-1-DECL_weak.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DEF_weak.o %t/weak-1-DEF.o %t/weak-1-DECL_weak.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout
+
+
+Link 'weak-1-DEF_weak.o', 'weak-1-DEF.o', 'weak-1-DECL_weak.o' twice.
+
+RUN: rm -f %t/stderr.golden
+RUN: echo "error, multiple definitions of '__exitval_ptr'" > %t/stderr.golden
+RUN: echo "first defined in 'weak-1-DEF.o', now found another definition while linking 'weak-1-DEF.o'" >> %t/stderr.golden
+
+RUN: rm -f %t/nvptx
+RUN: ( cd %t/ && %target_ld_cmd -o nvptx weak-1-DEF_weak.o weak-1-DEF.o weak-1-DECL_weak.o weak-1-DEF_weak.o weak-1-DEF.o weak-1-DECL_weak.o > stdout 2> stderr ); r=$?; [ x"$r" = x1 ]
+RUN: cmp %t/stderr.golden %t/stderr
+RUN: ! test -s %t/stdout
+RUN: ! test -f %t/nvptx
+
+
+Link 'weak-1-DECL_weak.o', 'weak-1-DEF_weak.o', 'weak-1-DEF.o'.
+
+RUN: cat %t/weak-1-DECL_weak.o %t/NUL %t/weak-1-DEF_weak.o %t/NUL %t/weak-1-DEF.o %t/NUL > %t/nvptx.golden
+RUN: %target_ld_cmd -o %t/nvptx %t/weak-1-DECL_weak.o %t/weak-1-DEF_weak.o %t/weak-1-DEF.o > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: ! test -s %t/stdout
+RUN: cmp %t/nvptx.golden %t/nvptx
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t/nvptx > %t/stdout 2> %t/stderr
+RUN: ! test -s %t/stderr
+RUN: cmp %S/weak-1-DEF.o.nm.golden %t/stdout

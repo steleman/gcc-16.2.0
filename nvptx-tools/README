@@ -1,0 +1,110 @@
+nvptx-tools: a collection of tools for use with nvptx-none GCC toolchains.
+
+  * nvptx-none-as: "assembler" for PTX.
+  * nvptx-none-ld: "linker" for PTX.
+  * nvptx-none-nm: list symbols.
+  * nvptx-none-run: run PTX binaries compiled with -mmainkernel.
+
+Additionally, the following symlinks are installed:
+
+  * nvptx-none-ar: link to the GNU/Linux host system's ar.
+  * nvptx-none-ranlib: link to the GNU/Linux host system's ranlib.
+
+
+Testsuite
+---------
+
+    $ make [-jN] check
+
+In addition to the testsuite of the included libiberty support library
+('check-libiberty'), this tests the nvptx-tools using a lit-based testsuite
+('check-lit'); see 'test/README'.
+
+The lit-based testsuite logs to 'test/lit.json.log', and postprocesses that
+file into 'test/lit.log', 'test/lit.sum' files, which are somewhat similar
+(but not identical) in format to DejaGnu's detailed and summary log files.
+
+Additional flags may be passed to lit, for example:
+
+    $ make [-jN] check LITFLAGS="--show-all --filter '^nvptx-tools :: (as|ld)/'"
+
+..., to display details, but just run the 'as/[...]', 'ld/[...]' test cases.
+
+By default, lit is run with '--timeout 10', to protect against rogue test
+cases.  In case this results in:
+
+    [...] fatal: Setting a timeout per test not supported. Requires the Python psutil module but it could not be found. Try installing it [...]
+
+..., then either do as advised, or override with '--timeout 0' in 'LITFLAGS'
+for no time limit.
+
+
+DejaGnu Board File
+------------------
+
+There is a DejaGnu board file included, nvptx-none-run.exp, which can be used
+as follows with the GCC testsuite:
+
+    $ make check DEJAGNU=[build-nvptx-tools]/dejagnu.exp RUNTESTFLAGS='--target_board=nvptx-none-run' [...]
+
+By default, this will use nvptx-none-run found in $PATH, but that can be
+overridden by setting the NVPTX_NONE_RUN environment variable.
+
+By default, nvptx-none-run invocation is serialized by means of a lock file.
+The default /tmp/gpu.lock may be overridden by setting the
+NVPTX_NONE_EXECUTION_LOCK_FILE environment variable.  Set it to the empty
+string to disable locking.
+
+
+Nvidia CUDA/PTX Dependency
+--------------------------
+
+The nvptx-tools are used for interfacing nvptx-none GCC toolchains with Nvidia
+tools and GPUs via Nvidia CUDA/PTX.
+
+Individual nvptx-tools depend on CUDA/PTX as follows:
+
+  * nvptx-none-as
+
+    In addition to its own minimalistic verification, it optionally verifies
+    the output file using the NVIDIA/CUDA nvJitLink library if usable (as of
+    CUDA 13.2, for our purposes), or 'ptxas'.  If (at run time) neither of
+    these is usable, this verification step is skipped (output file assumed
+    compliant).
+
+    Unless overridden with the '-m' option, the target architecture used for
+    verification is deduced from the '.target' directive in the input's
+    preamble, and then raised to the baseline version supported, as reported by
+    the NVIDIA/CUDA NVRTC library if usable (as of CUDA 11.2, for our
+    purposes), or sm_50.  Reason for sm_50 is that support for the Kepler
+    microarchitecture (sm_3x) in 'ptxas' has been removed in CUDA 11.0 through
+    12.0.  Support for sm_50 was available as of CUDA 6.0, and remained
+    supported until CUDA 13.0, which raised the baseline to sm_75.
+
+  * nvptx-none-run
+
+    Uses the CUDA Driver library ('libcuda') to run PTX binaries.
+
+
+Certain testcases for the nvptx-tools have dependencies as follows:
+
+  * nvptx-none-as
+
+    Certain test cases depend on availability/usability of the NVIDIA/CUDA
+    nvJitLink, NVRTC libraries, and/or 'ptxas'.
+
+  * nvptx-none-run
+
+    Testcases depending on this tool are UNSUPPORTED if it isn't available.
+    Otherwise, if no suitable CUDA Driver library or Nvidia GPU are available
+    (at run time), certain testcases FAIL.
+
+
+With reduced functionality as indicated, it's possible to build, test, and use
+the nvptx-tools without a CUDA installation.
+
+
+Report Issues
+-------------
+
+Report issues to <https://github.com/SourceryTools/nvptx-tools/issues>.

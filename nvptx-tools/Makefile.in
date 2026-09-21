@@ -1,0 +1,201 @@
+CXX = @CXX@
+CPPFLAGS = @CPPFLAGS@
+CPPFLAGS_EXTRA = -DPKGVERSION="\"@PKGVERSION@\"" \
+		 -DREPORT_BUGS_TO="\"@REPORT_BUGS_TO@\""
+DEFS = @DEFS@
+CPPFLAGS_ALL = $(DEFS) $(CPPFLAGS) $(CPPFLAGS_EXTRA)
+WARN_CXXFLAGS = @WARN_CXXFLAGS@
+WERROR = @WERROR@
+CXXFLAGS = @CXXFLAGS@
+CXXFLAGS_ALL = $(CXXFLAGS) $(WARN_CXXFLAGS) $(WERROR)
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+DL_LIBS = @DL_LIBS@
+
+NVPTX_RUN = @NVPTX_RUN@
+
+# nvptx-tools developer's section.
+
+#CUDA_TOOLKIT = [...]
+
+# For the testsuite: for 'ptxas' invoked from 'nvptx-none-as'.
+#PATH := $(CUDA_TOOLKIT)/bin:$(PATH)
+
+# Including the nvptx-tools-shipped 'include/cuda/nvrtc.h' (default) vs. <nvrtc.h>:
+#NVPTX_AS_CPPFLAGS += -DNVPTX_AS_INCLUDE_SYSTEM_NVRTC_H
+#NVPTX_AS_CPPFLAGS += -I$(CUDA_TOOLKIT)/include
+#
+# 'dlopen'ing the NVRTC library (default):
+NVPTX_AS_LDFLAGS += $(DL_LIBS)
+# ... vs. linking it:
+#NVPTX_AS_CPPFLAGS += -DNVPTX_AS_LINK_LIBNVRTC
+#NVPTX_AS_LDFLAGS += -L$(CUDA_TOOLKIT)/lib64 -Wl,-rpath,$(CUDA_TOOLKIT)/lib64
+#NVPTX_AS_LDFLAGS += -lnvrtc
+
+# Including the nvptx-tools-shipped 'include/cuda/nvJitLink.h' (default) vs. <nvJitLink.h>:
+#NVPTX_AS_CPPFLAGS += -DNVPTX_AS_INCLUDE_SYSTEM_NVJITLINK_H
+#NVPTX_AS_CPPFLAGS += -I$(CUDA_TOOLKIT)/include
+#
+# 'dlopen'ing the nvJitLink library (default):
+NVPTX_AS_LDFLAGS += $(DL_LIBS)
+# ... vs. linking it:
+#NVPTX_AS_CPPFLAGS += -DNVPTX_AS_LINK_LIBNVJITLINK
+#NVPTX_AS_LDFLAGS += -L$(CUDA_TOOLKIT)/lib64 -Wl,-rpath,$(CUDA_TOOLKIT)/lib64
+#NVPTX_AS_LDFLAGS += -lnvJitLink
+
+# Letting 'configure' decide whether to build 'nvptx-none-run' (default) vs. force-enabling its build:
+#NVPTX_RUN = nvptx-none-run
+#
+# Including the nvptx-tools-shipped 'include/cuda/cuda.h' (default) vs. <cuda.h>:
+#NVPTX_RUN_CPPFLAGS += -DNVPTX_RUN_INCLUDE_SYSTEM_CUDA_H
+#NVPTX_RUN_CPPFLAGS += -I$(CUDA_TOOLKIT)/include
+#
+# 'dlopen'ing the CUDA Driver library (default):
+NVPTX_RUN_LDFLAGS += $(DL_LIBS)
+# ... vs. linking it:
+#NVPTX_RUN_CPPFLAGS += -DNVPTX_RUN_LINK_LIBCUDA
+#NVPTX_RUN_LDFLAGS += -L$(CUDA_TOOLKIT)/lib64/stubs
+#NVPTX_RUN_LDFLAGS += -lcuda
+# See <https://github.com/SourceryTools/nvptx-tools/pull/21> 'Work around "libnvidia-fatbinaryloader.so needed by libcuda.so" linking issue'.
+#NVPTX_RUN_LDFLAGS += -Wl,--allow-shlib-undefined
+
+AR = @AR@
+RANLIB = @RANLIB@
+
+LIT = @LIT@
+LITFLAGS =
+
+JQ = @JQ@
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+libdir = @libdir@
+srcdir = @srcdir@
+
+mkinstalldirs = $(SHELL) $(srcdir)/mkinstalldirs
+
+PROGRAMS = nvptx-none-as nvptx-none-ld nvptx-none-nm $(NVPTX_RUN)
+
+all: $(PROGRAMS)
+
+libiberty.stmp:
+	cd libiberty/ && $(MAKE)
+	: > $@
+
+nvptx_none_as_SOURCES = $(srcdir)/nvptx-as.cc
+nvptx_none_as_SOURCES += $(srcdir)/interface-libnvrtc.cc
+nvptx_none_as_SOURCES += $(srcdir)/interface-libnvjitlink.cc
+nvptx_none_as_DEPENDENCIES = $(nvptx_none_as_SOURCES)
+nvptx_none_as_DEPENDENCIES += $(srcdir)/version.h
+nvptx_none_as_DEPENDENCIES += $(srcdir)/interface-libnvrtc.h
+nvptx_none_as_DEPENDENCIES += $(srcdir)/include/cuda/nvrtc.h
+nvptx_none_as_DEPENDENCIES += $(srcdir)/interface-libnvrtc-symbols.def
+nvptx_none_as_DEPENDENCIES += $(srcdir)/interface-libnvjitlink.h
+nvptx_none_as_DEPENDENCIES += $(srcdir)/include/cuda/nvJitLink.h
+nvptx_none_as_DEPENDENCIES += $(srcdir)/interface-libnvjitlink-symbols.def
+nvptx_none_as_DEPENDENCIES += libiberty.stmp
+
+nvptx-none-as: $(nvptx_none_as_DEPENDENCIES)
+	$(CXX) $(CPPFLAGS_ALL) $(CXXFLAGS_ALL) -I$(srcdir)/include \
+		$(nvptx_none_as_SOURCES) -o $@ \
+		-Llibiberty -liberty $(LDFLAGS) $(LIBS) \
+		$(NVPTX_AS_CPPFLAGS) $(NVPTX_AS_LDFLAGS)
+
+nvptx_none_ld_SOURCES = $(srcdir)/nvptx-ld.cc
+nvptx_none_ld_DEPENDENCIES = $(nvptx_none_ld_SOURCES)
+nvptx_none_ld_DEPENDENCIES += $(srcdir)/version.h
+nvptx_none_ld_DEPENDENCIES += libiberty.stmp
+
+nvptx-none-ld: $(nvptx_none_ld_DEPENDENCIES)
+	$(CXX) $(CPPFLAGS_ALL) $(CXXFLAGS_ALL) -I$(srcdir)/include \
+		$(nvptx_none_ld_SOURCES) -o $@ \
+		-Llibiberty -liberty $(LDFLAGS) $(LIBS)
+
+nvptx_none_nm_SOURCES = $(srcdir)/nvptx-nm.cc
+nvptx_none_nm_DEPENDENCIES = $(nvptx_none_nm_SOURCES)
+nvptx_none_nm_DEPENDENCIES += $(srcdir)/version.h
+nvptx_none_nm_DEPENDENCIES += libiberty.stmp
+
+nvptx-none-nm: $(nvptx_none_nm_DEPENDENCIES)
+	$(CXX) $(CPPFLAGS_ALL) $(CXXFLAGS_ALL) -I$(srcdir)/include \
+		$(nvptx_none_nm_SOURCES) -o $@ \
+		-Llibiberty -liberty $(LDFLAGS) $(LIBS)
+
+nvptx_none_run_SOURCES = $(srcdir)/nvptx-run.cc
+nvptx_none_run_SOURCES += $(srcdir)/interface-libcuda.cc
+nvptx_none_run_DEPENDENCIES = $(nvptx_none_run_SOURCES)
+nvptx_none_run_DEPENDENCIES += $(srcdir)/version.h
+nvptx_none_run_DEPENDENCIES += $(srcdir)/interface-libcuda.h
+nvptx_none_run_DEPENDENCIES += $(srcdir)/include/cuda/cuda.h
+nvptx_none_run_DEPENDENCIES += $(srcdir)/interface-libcuda-symbols.def
+nvptx_none_run_DEPENDENCIES += libiberty.stmp
+
+nvptx-none-run: $(nvptx_none_run_DEPENDENCIES)
+	$(CXX) $(CPPFLAGS_ALL) $(CXXFLAGS_ALL) -I$(srcdir)/include \
+		$(nvptx_none_run_SOURCES) -o $@ \
+		-Llibiberty -liberty $(LDFLAGS) $(LIBS) \
+		$(NVPTX_RUN_CPPFLAGS) $(NVPTX_RUN_LDFLAGS)
+
+
+# Testsuite
+
+.PHONY: check
+check:
+
+# libiberty
+
+check: check-libiberty
+.PHONY: check-libiberty
+check-libiberty: libiberty.stmp
+	cd libiberty/testsuite/ && $(MAKE) check
+
+# lit
+
+# Unless 'make' has been invoked in parallel mode ('-jN'), don't run lit in
+# parallel mode (stable output).  In parallel mode, don't pass a '-j' option to
+# lit, instead let it figure out the number of tests to run in parallel; we
+# don't know the 'N' parameter of the 'make' '-jN' option.
+LITFLAGS_J = $(if $(filter -j%,$(MFLAGS)),,-j 1)
+
+check: check-lit
+.PHONY: check-lit
+check-lit: all
+ifeq ($(LIT),)
+	@echo >&2 Need lit for \'$@\', see \'$(srcdir)/test/README\'
+	@exit 1
+else ifeq ($(JQ),)
+	@echo >&2 Need jq for \'$@\', see \'$(srcdir)/test/README\'
+	@exit 1
+else
+	rm -f test/lit.json.log test/lit.log test/lit.sum
+	date > test/lit.log
+	cp test/lit.log test/lit.sum
+	-$(LIT) --echo-all-commands --output test/lit.json.log --timeout 10 --order lexical $(LITFLAGS_J) $(LITFLAGS) test
+	$(JQ) -r '.tests[] | "\(.code): \(.name)\nElapsed: \(.elapsed)\n\(.output)\n"' < test/lit.json.log >> test/lit.log
+	$(JQ) -r '.tests[] | "\(.code): \(.name)"' < test/lit.json.log >> test/lit.sum
+endif
+
+
+.PHONY: install
+install: all
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	for x in $(PROGRAMS); do \
+		$(INSTALL_PROGRAM) -m 755 $$x $(DESTDIR)$(bindir)/$$x; \
+	done
+	rm -f $(DESTDIR)$(bindir)/nvptx-none-ar
+	rm -f $(DESTDIR)$(bindir)/nvptx-none-ranlib
+	ln -s $(AR) $(DESTDIR)$(bindir)/nvptx-none-ar
+	ln -s $(RANLIB) $(DESTDIR)$(bindir)/nvptx-none-ranlib
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/nvptx-none
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/nvptx-none/bin
+	rel=$$(perl -MFile::Spec -e 'print File::Spec->abs2rel(@ARGV)' \
+	  $(DESTDIR)$(bindir) $(DESTDIR)$(prefix)/nvptx-none/bin) && \
+	for p in ar as ld nm ranlib; do \
+	  rm -f $(DESTDIR)$(prefix)/nvptx-none/bin/"$$p" && \
+	  ln -s "$$rel"/nvptx-none-"$$p" $(DESTDIR)$(prefix)/nvptx-none/bin/"$$p"; \
+	done

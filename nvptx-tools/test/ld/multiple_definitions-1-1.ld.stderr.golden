@@ -1,0 +1,2 @@
+error, multiple definitions of '[NAME]'
+first defined in '[FILE1]', now found another definition while linking '[FILE2]'

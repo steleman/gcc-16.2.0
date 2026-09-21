@@ -1,0 +1,10 @@
+Enqueueing o/a.o
+Enqueueing o/a.o
+Starting first resolve run
+Resolving *inputfile 1 o/a.o via o/a.o
+Resolving *inputfile 0 o/a.o via o/a.o
+Linking o/a.o as 0
+Linking o/a.o as 1
+unresolved symbol f3 (ignored)
+unresolved symbol f1 (ignored)
+Disabling handling of special-purpose functions; '__trigger_gbl_ctors' not available

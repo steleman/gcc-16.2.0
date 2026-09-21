@@ -1,0 +1,6 @@
+resolving lib libgcc.a
+Enqueueing empty.o
+trying lib libgcc/libgcc.a
+Starting first resolve run
+Resolving *inputfile 0 empty.o via empty.o
+Linking empty.o as 0

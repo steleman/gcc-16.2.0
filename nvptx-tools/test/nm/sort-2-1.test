@@ -1,0 +1,82 @@
+Test sorting options, object files linked together (in contrast to 'sort-1.test').
+
+
+Link, without 'weak-1-DEF_weak.o'.
+
+RUN: %target_ld_cmd -o %t.nvptx --ignore-unresolved-symbol __mprec_bigtens %S/libc/libc_a-dtoa.o %S/libc/libc_a-environ.o %S/libc/libc_a-memset.o --ignore-unresolved-symbol __exitval_ptr --ignore-unresolved-symbol __gbl_ctors %S/../weak-1-DECL_weak.o.golden
+
+
+Default.
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+
+'--reverse-sort'/'-r'.
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd --reverse-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-r.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -r %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-r.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -r --reverse-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-r.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+
+'--numeric-sort'/'-n'.
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd --numeric-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-n.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -n %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-n.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -n --numeric-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-n.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+
+'--numeric-sort'/'-n', '--reverse-sort'/'-r'.
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -n --reverse-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-nr.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -nr %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-nr.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -nrnn %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-nr.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd --numeric-sort --reverse-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: cmp %S/sort-2-1.nm_-nr.golden %t.stdout
+RUN: ! test -s %t.stderr
+
+
+'--no-sort'/'-p'.
+
+RUN: sort < %S/sort-2-1.nm.golden > %t.sort-2-1.nm.golden.sorted
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd --no-sort %t.nvptx > %t.stdout 2> %t.stderr
+RUN: sort < %t.stdout > %t.stdout.sorted
+RUN: cmp %t.sort-2-1.nm.golden.sorted %t.stdout.sorted
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd -p %t.nvptx > %t.stdout 2> %t.stderr
+RUN: sort < %t.stdout > %t.stdout.sorted
+RUN: cmp %t.sort-2-1.nm.golden.sorted %t.stdout.sorted
+RUN: ! test -s %t.stderr
+
+RUN: %env_LC_COLLATE=C_target_nm_cmd --no-sort -p %t.nvptx > %t.stdout 2> %t.stderr
+RUN: sort < %t.stdout > %t.stdout.sorted
+RUN: cmp %t.sort-2-1.nm.golden.sorted %t.stdout.sorted
+RUN: ! test -s %t.stderr

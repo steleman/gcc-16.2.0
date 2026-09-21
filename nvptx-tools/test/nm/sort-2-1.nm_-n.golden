@@ -1,0 +1,9 @@
+                 w __exitval_ptr
+                 w __gbl_ctors
+                 U __mprec_bigtens
+0000000000000000 d $LC2
+0000000000000000 T _dtoa_r
+0000000000000000 D environ
+0000000000000000 d initial_env
+0000000000000000 T memset
+0000000000000000 t quorem

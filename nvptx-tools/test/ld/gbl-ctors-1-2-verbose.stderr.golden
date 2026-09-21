@@ -1,0 +1,8 @@
+Enqueueing gbl-ctors-1.o
+Enqueueing gbl-ctors-2.o
+Starting first resolve run
+Resolving *inputfile 1 gbl-ctors-2.o via gbl-ctors-2.o
+Resolving *inputfile 0 gbl-ctors-1.o via gbl-ctors-1.o
+Linking gbl-ctors-1.o as 0
+Linking gbl-ctors-2.o as 1
+Disabling handling of special-purpose functions; '__trigger_gbl_ctors' not available

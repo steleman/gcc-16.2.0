@@ -1,0 +1,76 @@
+2020-08-20  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR bootstrap/96612
+	* ax_cxx_compile_stdcxx.m4: Add fourth argument to check also
+	the CXX_FOR_BUILD compiler.
+
+2020-05-18  Jason Merrill  <jason@redhat.com>
+
+	* ax_cxx_compile_stdcxx.m4: Import from autoconf archive with
+	an adjustment to try the default mode.
+
+2015-05-27  Jason Merrill  <jason@redhat.com>
+
+	PR bootstrap/66304
+	* warnings.m4 (ACX_PROG_CXX_WARNING_OPTS)
+	(ACX_PROG_CXX_WARNINGS_ARE_ERRORS)
+	(ACX_PROG_CXX_WARNING_ALMOST_PEDANTIC): New.
+	(ACX_PROG_CC_WARNING_OPTS, ACX_PROG_CC_WARNING_ALMOST_PEDANTIC)
+	(ACX_PROG_CC_WARNINGS_ARE_ERRORS): Push into C language context.
+
+2011-12-20  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* warnings.m4 (ACX_PROG_CC_WARNING_OPTS): Avoid leading dash in
+	expr call.
+
+2011-12-19  Andreas Schwab  <schwab@linux-m68k.org>
+
+	PR bootstrap/51388
+	* warnings.m4 (ACX_PROG_CC_WARNING_OPTS)
+	(ACX_PROG_CC_WARNING_ALMOST_PEDANTIC): Run the test without the
+	no- prefix.
+
+2009-04-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* warnings.m4: Change copyright header to refer to version
+	3 of the GNU General Public License and to point readers at the
+	COPYING3 file and the FSF's license web page.
+
+2007-03-26  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* acx.m4 (ACX_BUGURL): Set BUGURL first. Quote $BUGURL first
+	when setting REPORT_BUGS_TEXI.
+
+2007-03-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* acx.m4 (ACX_BUGURL): Replace "@" with "@@" for
+	REPORT_BUGS_TEXI.
+
+2007-03-23  Joseph Myers  <joseph@codesourcery.com>
+
+	* acx.m4 (ACX_PKGVERSION, ACX_BUGURL): Define.
+
+2007-01-11  Paolo Bonzini  <bonzini@gnu.org>
+
+	* warnings.m4: Use m4_expand_once to clear the AC_SUBST'ed variable.
+	(ACX_PROG_CC_WARNINGS_ARE_ERRORS): Fix typo.  Add optional 2nd argument.
+
+2007-01-11  Paolo Bonzini  <bonzini@gnu.org>
+
+	* warnings.m4: Add second parameter with name of variable.
+	Always append to the variable if it exists.
+
+2005-05-12  Ryota Kunisawa  <kunisawa@access.co.jp>
+
+	PR bootstrap/21230
+	* warnings.m4 (ACX_PROG_CC_WARNING_ALMOST_PEDANTIC): Add
+	double quotes around GCC variable.
+
+2005-01-23  Joseph S. Myers  <joseph@codesourcery.com>
+
+	* warnings.m4 (ACX_PROG_CC_WARNING_ALMOST_PEDANTIC): Don't do
+	anything for non-GCC compilers.
+
+2004-09-24  Zack Weinberg  <zack@codesourcery.com>
+
+	* warnings.m4: New file.

@@ -1,0 +1,22 @@
+Enqueueing o/f1.o
+Enqueueing o/f2.o
+Enqueueing o/f3.o
+Enqueueing o/a.o
+Enqueueing o/f2.o
+Enqueueing o/f3.o
+Enqueueing o/f1.o
+Starting first resolve run
+Resolving *inputfile 6 o/f1.o via o/f1.o
+Resolving *inputfile 5 o/f3.o via o/f3.o
+Resolving *inputfile 4 o/f2.o via o/f2.o
+Resolving *inputfile 3 o/a.o via o/a.o
+Resolving *inputfile 2 o/f3.o via o/f3.o
+Resolving *inputfile 1 o/f2.o via o/f2.o
+Resolving *inputfile 0 o/f1.o via o/f1.o
+Linking o/f1.o as 0
+Linking o/f2.o as 1
+Linking o/f3.o as 2
+Linking o/a.o as 3
+Linking o/f2.o as 4
+error, multiple definitions of 'f2'
+first defined in 'o/f2.o', now found another definition while linking 'o/f2.o'
