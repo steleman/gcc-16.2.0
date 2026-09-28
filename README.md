@@ -1,7 +1,7 @@
 # `-mcmodel=large` with `-fpic`/`-fPIC` for AArch64 and RISCV64 -- GCC 16.2.0
 
 This series adds a position-independent large code model to GCC for AArch64
-and RV64, so shared libraries and position-independent executables can place
+and RISCV64, so shared libraries and position-independent executables can place
 code, data and the GOT arbitrarily far apart. Upstream GCC rejects
 `-mcmodel=large` together with `-fpic`, `-fPIC`, `-fpie` or `-fPIE` on both
 architectures.
@@ -12,7 +12,10 @@ in one link, and the result links with ld.bfd, ld.gold and lld.
 
 Neither model is part of a published ABI. AAELF64 defines no large PIC code
 model, and the RISCV psABI currently forbids the large code model with PIC.
-Both are extensions that GCC, LLVM and binutils implement the same way.
+Both are extensions that [GCC 16.2.0](https://github.com/steleman/gcc-16.2.0),
+[LLVM 23.1.1](https://github.com/steleman/llvm-23.1.1) and
+[Binutils 2.46.1](https://github.com/steleman/binutils-2.46.1) implement the
+same way.
 
 ## Contents
 
@@ -23,7 +26,7 @@ Both are extensions that GCC, LLVM and binutils implement the same way.
 | 0003 | AArch64 | Accept `-mcmodel=large` with PIC on ELF; `invoke.texi` |
 | 0004 | AArch64 | Tests `gcc.target/aarch64/large-pic-{1..8}.c` |
 | 0005 | RISCV | Large PIC model: self-relative literal-pool entries plus `.data.rel.ro` slots |
-| 0006 | RISCV | Accept `-mcmodel=large` with PIC on RV64; `invoke.texi` |
+| 0006 | RISCV | Accept `-mcmodel=large` with PIC on RISCV64; `invoke.texi` |
 | 0007 | RISCV | Tests `gcc.target/riscv/large-pic-{1..4}.c` |
 | 0008 | RISCV | 8-byte PC-relative EH pointers (FDE, personality, LSDA) in the large model, PIC and non-PIC |
 | 0009 | libgcc | Binary search of `DW_EH_PE_datarel\|sdata8` `.eh_frame_hdr` tables |
