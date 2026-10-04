@@ -16748,6 +16748,50 @@ riscv_prefetch_offset_address_p (rtx x, machine_mode mode)
   return true;
 }
 
+/* Implement the TARGET_OFFLOAD_OPTIONS hook.  The host options select the
+   ABI for the object that mkoffload compiles with the host compiler; it has
+   to be link-compatible with the rest of the program.  */
+
+static char *
+riscv_offload_options (void)
+{
+  const char *abi_name;
+
+  switch (riscv_abi)
+    {
+    case ABI_ILP32:
+      abi_name = "ilp32";
+      break;
+    case ABI_ILP32E:
+      abi_name = "ilp32e";
+      break;
+    case ABI_ILP32F:
+      abi_name = "ilp32f";
+      break;
+    case ABI_ILP32D:
+      abi_name = "ilp32d";
+      break;
+    case ABI_LP64:
+      abi_name = "lp64";
+      break;
+    case ABI_LP64E:
+      abi_name = "lp64e";
+      break;
+    case ABI_LP64F:
+      abi_name = "lp64f";
+      break;
+    case ABI_LP64D:
+      abi_name = "lp64d";
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  return concat (POINTER_SIZE == 64
+		 ? "-foffload-abi=lp64" : "-foffload-abi=ilp32",
+		 " -foffload-abi-host-opts=-mabi=", abi_name, NULL);
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -16758,6 +16802,9 @@ riscv_prefetch_offset_address_p (rtx x, machine_mode mode)
 
 #undef TARGET_OPTION_OVERRIDE
 #define TARGET_OPTION_OVERRIDE riscv_option_override
+
+#undef TARGET_OFFLOAD_OPTIONS
+#define TARGET_OFFLOAD_OPTIONS riscv_offload_options
 
 #undef TARGET_OPTION_SAVE
 #define TARGET_OPTION_SAVE riscv_option_save

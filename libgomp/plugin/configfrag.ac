@@ -61,7 +61,7 @@ if test x"$enable_offload_targets" != x; then
     case $tgt in
       nvptx*)
 	case "${target}" in
-	  aarch64*-*-* | powerpc64le-*-* | x86_64-*-*)
+	  aarch64*-*-* | powerpc64le-*-* | riscv64*-*-* | x86_64-*-*)
 	    case "$ac_cv_sizeof_void_p" in
 	      4)
 		# PR libgomp/65099: Currently, we only support offloading in
